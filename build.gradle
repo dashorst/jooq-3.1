@@ -1,0 +1,65 @@
+ext {
+    junitVer = '4.11'
+    hamcrestVer = '1.3'
+    assertjVer = '1.6.1'
+    log4jVer = '1.2.17'
+    slf4jApiVer = '1.7.7'
+    persistenceVer = '2.1.0'
+
+    libraries = [
+        hamcrestCore: "org.hamcrest:hamcrest-core:${hamcrestVer}@jar",
+        junit: "junit:junit:${junitVer}@jar",
+        assertjCore: "org.assertj:assertj-core:${assertjVer}@jar",
+        log4j: "log4j:log4j:${log4jVer}@jar",
+        slf4jApi: "org.slf4j:slf4j-api:${slf4jApiVer}@jar",
+        persistence: "org.eclipse.persistence:javax.persistence:${persistenceVer}@jar"
+    ]
+}
+
+/* 软件库 */
+repositories {
+    /* 本地软件库，在用户目录的 .gradle 目录下 */
+    mavenLocal()
+    jcenter()
+    /* 中心软件库，可在 http://search.maven.org 下搜索需要的软件 */
+    mavenCentral()
+}
+
+/* 编译java */
+apply plugin: 'java'
+apply plugin: 'maven'
+
+apply plugin: 'idea'
+
+/* 编译编码为utf8的源码 */
+[compileJava, compileTestJava]*.options*.encoding = 'UTF-8'
+compileJava.options.define(compilerArgs: ["-proc:none", "-encoding", "UTF-8"])
+compileTestJava.options.define(compilerArgs: ["-proc:none", "-encoding", "UTF-8"])
+
+tasks.withType(GroovyCompile) {
+    groovyOptions.encoding = "MacRoman"
+}
+
+task myJavadocs(type: Javadoc) {
+    source = sourceSets.main.allJava
+}
+
+project.buildDir = "$projectBuildDir"
+
+/* 使用jdk1.7 */
+sourceCompatibility = 1.7
+targetCompatibility = "1.7"
+/* 生成包的版本为1.0 */
+version = '3.1.0'
+
+/* 依赖包 */
+dependencies {
+    /* 测试用的junit */
+    testCompile libraries.hamcrestCore
+    testCompile libraries.junit
+    testCompile libraries.assertjCore
+
+    compile libraries.log4j
+    compile libraries.slf4jApi
+    compile libraries.persistence
+}
