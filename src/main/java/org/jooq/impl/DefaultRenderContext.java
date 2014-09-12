@@ -327,13 +327,19 @@ class DefaultRenderContext extends AbstractContext<RenderContext> implements Ren
                 case ASE:
                 case SQLSERVER:
                 case SYBASE:
-                    sql("[").sql(StringUtils.replace(literal, "]", "]]")).sql("]");
+                    // 分页的order by用实际列，已带中括号。
+                    if (literal != null && literal.startsWith("[") && literal.endsWith("]")) {
+                        sql(literal);
+                    } else {
+                        sql("[").sql(StringUtils.replace(literal, "]", "]]")).sql("]");
+                    }
                     break;
-
+                case DB2:
+                    sql(literal);
+                    break;
                 // Most dialects implement the SQL standard, using double quotes
                 case SQLITE:
                 case CUBRID:
-                case DB2:
                 case DERBY:
                 case FIREBIRD:
                 case H2:

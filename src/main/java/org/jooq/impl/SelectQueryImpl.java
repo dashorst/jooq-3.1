@@ -51,6 +51,7 @@ import static org.jooq.SQLDialect.SQLSERVER;
 import static org.jooq.SQLDialect.SQLSERVER2008;
 import static org.jooq.SQLDialect.SQLSERVER2012;
 import static org.jooq.conf.ParamType.INLINED;
+import static org.jooq.impl.DSL.denseRank;
 import static org.jooq.impl.DSL.inline;
 import static org.jooq.impl.DSL.name;
 import static org.jooq.impl.DSL.one;
@@ -82,6 +83,7 @@ import org.jooq.TableLike;
 import org.jooq.conf.ParamType;
 import org.jooq.exception.DataAccessException;
 import org.jooq.tools.StringUtils;
+import org.jooq.SortOrder;
 
 /**
  * A sub-select is a <code>SELECT</code> statement that can be combined with
@@ -350,7 +352,12 @@ class SelectQueryImpl<R extends Record> extends AbstractSelect<R> implements Sel
         // window function, calculating row numbers for the LIMIT .. OFFSET clause
         RenderContext local = new DefaultRenderContext(context);
         local.subquery(true);
-        toSQLReference0(local, rowNumber().over().orderBy(getNonEmptyOrderBy()).as(rownumName));
+        // TODO: 是否需要替换为dense_rank()？
+        if (distinct) {
+            toSQLReference0(local, denseRank().over().orderBy(getNonEmptyOrderBy()).as(rownumName));
+        } else {
+            toSQLReference0(local, rowNumber().over().orderBy(getNonEmptyOrderBy()).as(rownumName));
+        }
         String enclosed = local.render();
 
         context.keyword("select * from (")
@@ -466,6 +473,7 @@ class SelectQueryImpl<R extends Record> extends AbstractSelect<R> implements Sel
                     if (dialect == SQLSERVER2008 || !getLimit().isApplicable()) {
                         context.keyword("top 100 percent ");
                     }
+
                 }
 
                 break;
@@ -843,10 +851,51 @@ class SelectQueryImpl<R extends Record> extends AbstractSelect<R> implements Sel
         return orderBy;
     }
 
+    /**
+     * 取得对象的属性值
+     * @param obj 指定对象
+     * @param clazz 属性类
+     * @param fieldName 属性名
+     * @return 属性值
+     */
+    private Object getFieldObject(Object obj, Class<?> clazz, String fieldName) {
+        Object result = null;
+        try {
+            java.lang.reflect.Field field = clazz.getDeclaredField(fieldName);
+            field.setAccessible(true);
+            if (obj != null) {
+                result = field.get(obj);
+            }
+        } catch (Exception e) {
+            // do nothing
+        }
+        return result;
+    }
+
+    /**
+     * 排序的列采用了别名，需要替换为具体的列名
+     * @param sortField
+     */
+    private SortField initSortField(SortField<?> sortField) {
+        SortField result = sortField;
+        FieldAlias<?> fieldAlias = (FieldAlias) getFieldObject(sortField, SortFieldImpl.class, "field");
+        Alias<?> alias = (Alias) getFieldObject(fieldAlias, FieldAlias.class, "alias");
+        SQLField<?> wrapped = (SQLField) getFieldObject(alias, Alias.class, "wrapped");
+        String name = wrapped.getName();
+        if (wrapped != null && name != null) {
+            Field newAlias = new FieldAlias(wrapped, name);
+            SortField newSortField = new SortFieldImpl(newAlias, SortOrder.ASC);
+            sortField = newSortField;
+        }
+        return sortField;
+    }
+
     final SortFieldList getNonEmptyOrderBy() {
         if (getOrderBy().isEmpty()) {
             SortFieldList result = new SortFieldList();
-            result.add(getSelect().get(0).asc());
+            SortField<?> sortField = getSelect().get(0).asc();
+            SortField<?> newSortField = initSortField(sortField);
+            result.add(newSortField);
             return result;
         }
 
